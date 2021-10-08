@@ -1,5 +1,5 @@
 <template>
-  <div id="home">
+  <div id="home" :class="warmTemp">
     <main>
       <div class="search-box">
         <input 
@@ -7,40 +7,87 @@
           class="search-bar"
           placeholder="回车拼音搜索"
           v-model="city"
-          @keypress="searchInput"
+          @keypress="getHomeData"
         >
       </div>
 
-      <div class="weather-wrap">
-        <div class="location-box">
-          <div class="location">城市名,国名</div>
-          <div class="date">时间</div>
+      <div v-if="this.data.weather != undefined">
+        <div class="weather-wrap">
+          <div class="location-box">
+            <div class="location">{{data.name}}-{{data.country}}</div>
+            <div class="date">{{timeInfo.weekDay}} {{timeInfo.month}}.{{timeInfo.day}}</div>
+          </div>
         </div>
-      </div>
 
-      <div class="weather-box">
-        <div class="temp">26°</div>
-        <div class="weather">晴天</div>
+        <div class="weather-box">
+          <div class="temp">{{data.temp | unitize}}</div>
+          <div class="weather">{{data.weather}}</div>
+        </div>
       </div>
     </main>
   </div>
 </template>
 <script>
+import { request } from 'network/request.js'
+import { HomeWeather } from 'network/home.js'
 export default {
   name: 'Home',
   data() {
     return {
       city: '',
-      data: {}
+      data: {},
+      timeInfo: {}
     }
   },
   methods: {
-    searchInput(e) {
+    getHomeData(e) {
       if(e.key === 'Enter') {
-        console.log(this.city);
+        e.target.disabled = true
+        const instance = request({
+          url: 'weather',
+          params: {
+            q: this.city,
+            appid: 'c49e31970dc5477a895da17444c626a0',
+            lang: "zh_cn",
+            units: 'metric'
+          }
+        })
+
+        instance.then(res => {
+            e.target.disabled = false
+            const data = res.data;
+            // console.log(data);
+            this.data = new HomeWeather(data.dt, data.name, data.sys, data.main, data.weather)
+            // console.log(this.data.timestamp);
+            this.getTimeInfo(this.data.timestamp * 1000)
+          }, err => {
+            e.target.disabled = false
+            console.log(err);
+          })
+
         this.city = ''
       }
 
+    },
+    getTimeInfo(date) {
+      const o = new Date(date)
+      // console.log('--------------------');
+      const days = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+      const weekDay = days[o.getDay()]
+      const day = o.getDate()
+      const month = o.getMonth() + 1
+      const year = o.getFullYear()
+      this.timeInfo = {weekDay, day, month, year}
+    }
+  },
+  filters: {
+    unitize(value) {
+      return `${Math.round(value)}°C`
+    }
+  },
+  computed: {
+    warmTemp() {
+      return {warm: typeof this.data.temp != undefined && this.data.temp >= 21 ? true : false}
     }
   }
 }
@@ -51,6 +98,10 @@ export default {
     background-size: cover;
     background-position: bottom;
     transition: 0.4s;
+  }
+
+  #home.warm {
+    background-image: url('~assets/img/warm-bg.jpg');
   }
 
   main {
@@ -98,11 +149,12 @@ export default {
   }
 
   .location-box .date {
+    margin: 18px 0;
     color: #FFF;
     font-size: 20px;
-    font-weight: 300;
-    font-style: italic;
+    font-weight: 600;
     text-align: center;
+    font-family: Arial,'宋体',sans-serif;
   }
 
   .weather-box {
@@ -130,7 +182,6 @@ export default {
     color: #fff;
     font-size: 48px;
     font-weight: 700;
-    font-style: italic;
     text-shadow: 3px 6px rgba(0, 0, 0, 0.25);
   }
 </style>
